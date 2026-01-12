@@ -1,10 +1,8 @@
 #pragma once
-
 #include "../ui_core.h"
 #include "../pages/help_dialog.h"
 #include "../ui_colors.h"
 #include "../ui_utils.h"
-
 class BankSelectionBarComponent;
 class PatternSelectionBarComponent;
 
@@ -39,6 +37,12 @@ class PatternEditPage : public IPage, public IMultiHelpFramesProvider {
   void ensureStepFocus();
   void withAudioGuard(const std::function<void()>& fn);
 
+  // === New helpers ===
+  void setStepNoteAbsolute(int step, int target_note);
+  void transposePattern(int semitoneDelta);
+  void rotatePattern(int delta); // +1 = forward/right, -1 = backward/left
+  void copyFirstHalfToSecondHalf();
+
   IGfx& gfx_;
   MiniAcid& mini_acid_;
   AudioGuard& audio_guard_;
@@ -51,4 +55,7 @@ class PatternEditPage : public IPage, public IMultiHelpFramesProvider {
   std::string title_;
   std::shared_ptr<PatternSelectionBarComponent> pattern_bar_;
   std::shared_ptr<BankSelectionBarComponent> bank_bar_;
+
+  // === New state ===
+  int last_note_entered_; // remembers last explicit note value placed/edited
 };
