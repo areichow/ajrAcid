@@ -221,8 +221,6 @@ const std::string & PatternEditPage::getTitle() const {
   return title_;
 }
 
-// === New helpers ===
-
 void PatternEditPage::setStepNoteAbsolute(int step, int target_note) {
   const int8_t* notes = mini_acid_.pattern303Steps(voice_index_);
   int current_note = notes[step];
@@ -236,7 +234,6 @@ void PatternEditPage::setStepNoteAbsolute(int step, int target_note) {
     if (current_note < 0) {
       int delta = target_note - MiniAcid::kMin303Note;
       if (delta == 0) {
-        // nudge to create a C1, then back to C1
         mini_acid_.adjust303StepNote(voice_index_, step, 1);
         mini_acid_.adjust303StepNote(voice_index_, step, -1);
       } else {
@@ -265,7 +262,6 @@ void PatternEditPage::transposePattern(int semitoneDelta) {
 
 void PatternEditPage::rotatePattern(int delta) {
   if (delta == 0) return;
-  // prepare current state
   int current_notes[SEQ_STEPS];
   bool current_accent[SEQ_STEPS];
   bool current_slide[SEQ_STEPS];
@@ -277,7 +273,6 @@ void PatternEditPage::rotatePattern(int delta) {
     current_accent[i] = accent[i];
     current_slide[i]  = slide[i];
   }
-  // build rotated targets
   int target_notes[SEQ_STEPS];
   bool target_accent[SEQ_STEPS];
   bool target_slide[SEQ_STEPS];
@@ -288,7 +283,6 @@ void PatternEditPage::rotatePattern(int delta) {
     target_accent[i] = current_accent[src];
     target_slide[i]  = current_slide[src];
   }
-  // apply differences using the same approach as paste
   withAudioGuard([&]() {
     for (int i = 0; i < SEQ_STEPS; ++i) {
       int target_note  = target_notes[i];
@@ -338,7 +332,6 @@ void PatternEditPage::copyFirstHalfToSecondHalf() {
       int src = i - 8;
       int target_note  = current_notes[src];
       int current_note = current_notes[i];
-
       if (target_note < 0) {
         if (current_note >= 0) mini_acid_.clear303StepNote(voice_index_, i);
       } else if (current_note < 0) {
@@ -353,7 +346,6 @@ void PatternEditPage::copyFirstHalfToSecondHalf() {
         int deltaN = target_note - current_note;
         if (deltaN != 0) mini_acid_.adjust303StepNote(voice_index_, i, deltaN);
       }
-
       if (current_accent[i] != current_accent[src]) {
         mini_acid_.toggle303AccentStep(voice_index_, i);
       }
@@ -512,8 +504,6 @@ bool PatternEditPage::handleEvent(UIEvent& ui_event) {
     withAudioGuard([&]() { mini_acid_.toggle303AccentStep(voice_index_, step); });
     return true;
   }
-
-  // ===== NOTE EDITING WITH "LAST NOTE" MEMORY =====
   case 'a': { // semitone up OR place last note on empty
     ensureStepFocusAndCursor();
     int step = activePatternStep();
@@ -524,12 +514,11 @@ bool PatternEditPage::handleEvent(UIEvent& ui_event) {
     } else {
       withAudioGuard([&]() { mini_acid_.adjust303StepNote(voice_index_, step, 1); });
     }
-    // update last_note_entered_
     current = mini_acid_.pattern303Steps(voice_index_)[step];
     if (current >= 0) last_note_entered_ = current;
     return true;
   }
-  case 'z': { // semitone down (unchanged on empty)
+  case 'z': { // semitone down
     ensureStepFocusAndCursor();
     int step = activePatternStep();
     withAudioGuard([&]() { mini_acid_.adjust303StepNote(voice_index_, step, -1); });
@@ -565,20 +554,19 @@ bool PatternEditPage::handleEvent(UIEvent& ui_event) {
     if (current >= 0) last_note_entered_ = current;
     return true;
   }
-
-  case 'd': { // transpose up by semitone
+  case 'g': { // transpose up by semitone
     transposePattern(+1);
     return true;
   }
-  case 'c': { // transpose down by semitone
+  case 'b': { // transpose down by semitone
     transposePattern(-1);
     return true;
   }
-  case 'f': { // forward/right rotation
+  case 'h': { // forward/right rotation
     rotatePattern(+1);
     return true;
   }
-  case 'v': { // backward/left rotation
+  case 'n': { // backward/left rotation
     rotatePattern(-1);
     return true;
   }
