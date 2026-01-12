@@ -22,26 +22,38 @@ void ChamberlinFilter::setSampleRate(float sr) {
 }
 
 float ChamberlinFilter::process(float input, float cutoffHz, float resonance) {
+  // tuning coefficient (chamberlin filter): f = 2*sin(pi*fc/fs); clamp to safe range
   float f = 2.0f * sinf(3.14159265f * cutoffHz / _sampleRate);
   if (!isfinite(f))
-    f = 0.0f;
-  float q = 1.0f / (1.0f + resonance * 4.0f);
-  if (q < 0.06f)
-    q = 0.06f;
+  	f = 0.0f;
+  if (f > 1.9f) f = 1.9f; // avoid extreme integrator gain
+  if (f < 0.0f) f = 0.0f;
+
+  // new resonance mapping: 0 -> essentially no resonance; 1 -> very resonant but bounded.
+  // we map resonance onto a damping factor q in (0..1]. Larger q = more damping (less resonance)
+  // using a curved response so the lower half of the knob covers gentle musical range
+  float r = resonance;
+  if (r < 0.0f) r = 0.0f;
+  if (r > 0.995f) r = 0.995f; // keep some margin from self-oscillation
+  float q = 1.0f - (r * 0.96f); // r=0 -> q≈1.0 (flat), r≈1 -> q≈0.04 (high resonance)
+  if (q < 0.01f) q = 0.01f;
 
   float hp = input - _lp - q * _bp;
   _bp += f * hp;
   _lp += f * _bp;
 
-  _bp = tanhf(_bp * 1.3f);
-
-  // Keep states bounded to avoid numeric blowups
-  const float kStateLimit = 50.0f;
+  // more gentle saturation for less squelch - orig was 1.3; ajr v1 0.9
+  _bp = tanhf(_bp * 1.1f);
+  const float kStateLimit = 20.0f;
   if (_lp > kStateLimit) _lp = kStateLimit;
   if (_lp < -kStateLimit) _lp = -kStateLimit;
   if (_bp > kStateLimit) _bp = kStateLimit;
   if (_bp < -kStateLimit) _bp = -kStateLimit;
 
+  // Output gain compensation: reduce level as resonance increases to avoid harshness
+  // float gainComp = 1.0f - (resonance * 0.45f);
+  // if (gainComp < 0.2f) gainComp = 0.2f;
+  // return _lp * gainComp;
   return _lp;
 }
 
@@ -88,7 +100,13 @@ void TB303Voice::startNote(float freqHz, bool accent, bool slideFlag) {
   targetFreq = freqHz;
 
   gate = true;
-  env = accent ? 2.0f : 1.0f;
+  // smaller boost than before (was 2.0f vs 1.0f) to decrease squelch
+  // orig:
+  // env = accent ? 2.0f : 1.0f;
+  // ajr orig - 
+  // env = accent ? 1.45f : 1.0f;
+  // let's try a little more
+  env = accent ? 1.7f : 1.0f;
 }
 
 void TB303Voice::release() { gate = false; }
@@ -165,6 +183,11 @@ float TB303Voice::svfProcess(float input) {
     env *= decayCoeff;
   }
 
+  // Accent-derived gentle drive: slightly warm the input when envelope is higher
+  float drive = 1.0f + 0.08f * (env - 1.0f);
+  if (drive < 1.0f) drive = 1.0f;
+  float driven = tanhf(input * drive);
+
   float cutoffHz = parameterValue(TB303ParamId::Cutoff) + parameterValue(TB303ParamId::EnvAmount) * env;
   if (cutoffHz < 50.0f)
     cutoffHz = 50.0f;
@@ -208,9 +231,9 @@ int TB303Voice::oscillatorIndex() const {
 }
 
 void TB303Voice::initParameters() {
-  params[static_cast<int>(TB303ParamId::Cutoff)] = Parameter("cut", "Hz", 60.0f, 2500.0f, 800.0f, (2500.f - 60.0f) / 128);
-  params[static_cast<int>(TB303ParamId::Resonance)] = Parameter("res", "", 0.05f, 0.85f, 0.6f, (0.85f - 0.05f) / 128);
-  params[static_cast<int>(TB303ParamId::EnvAmount)] = Parameter("env", "Hz", 0.0f, 2000.0f, 400.0f, (2000.0f - 0.0f) / 128);
+  params[static_cast<int>(TB303ParamId::Cutoff)] = Parameter("cut", "Hz", 40.0f, 3000.0f, 700.0f, (3000.f - 40.0f) / 128);
+  params[static_cast<int>(TB303ParamId::Resonance)] = Parameter("res", "", 0.0f, 0.95f, 0.25f, (0.95f - 0.0f) / 128);
+  params[static_cast<int>(TB303ParamId::EnvAmount)] = Parameter("env", "Hz", 0.0f, 1800.0f, 250.0f, (1800.0f - 0.0f) / 128);
   params[static_cast<int>(TB303ParamId::EnvDecay)] = Parameter("dec", "ms", 20.0f, 2200.0f, 420.0f, (2200.0f - 20.0f) / 128);
   params[static_cast<int>(TB303ParamId::Oscillator)] = Parameter("osc", "", kOscillatorOptions, 3, 0);
   params[static_cast<int>(TB303ParamId::MainVolume)] = Parameter("vol", "", 0.0f, 1.0f, 0.8f, 1.0f / 128);
