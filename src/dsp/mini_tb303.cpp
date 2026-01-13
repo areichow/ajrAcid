@@ -115,6 +115,20 @@ void TB303Voice::startNote(float freqHz, bool accent, bool slideFlag) {
 
 void TB303Voice::release() { gate = false; }
 
+
+// polyblep helper: band-limit discontinuities for saw edges
+static inline float poly_blep(float t, float dt) {
+	if (dt <= 0.0f) return 0.0f;
+	if (t < dt) {
+		float x = t / dt;
+		return x + x - x * x - 1.0f;
+	}
+	if (t > 1.0f - dt) {
+		float x = (t - 1.0f) / dt;
+		return x * x + x + x + 1.0f;
+	}
+	return 0.0f;
+}
 float TB303Voice::oscSaw() {
   phase += freq * invSampleRate;
   if (phase >= 1.0f) {
@@ -180,6 +194,10 @@ float TB303Voice::oscJunoSaw() {
   if (junoPhaseB >= 1.0f) junoPhaseB -= floorf(junoPhaseB);
   float sawA = 2.0f * junoPhaseA - 1.0f;
   float sawB = 2.0f * junoPhaseB - 1.0f;
+  float dtA = incA; if (dtA > 1.0f) dtA = 1.0f;
+  float dtB = incB; if (dtB > 1.0f) dtB = 1.0f;
+  sawA -= poly_blep(junoPhaseA, dtA);
+  sawB -= poly_blep(junoPhaseB, dtB);
 
   float sum = baseSaw + sawA + sawB;
   return sum * (1.0f / 3.0f);
