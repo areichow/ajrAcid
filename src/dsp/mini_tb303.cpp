@@ -4,7 +4,7 @@
 #include <stdlib.h>
 
 namespace {
-const char* const kOscillatorOptions[] = {"saw", "sqr", "super"};
+const char* const kOscillatorOptions[] = {"saw", "sqr", "super", "juno"};
 } // namespace
 
 ChamberlinFilter::ChamberlinFilter(float sampleRate) : _lp(0.0f), _bp(0.0f), _sampleRate(sampleRate) {
@@ -80,6 +80,10 @@ void TB303Voice::reset() {
   gate = false;
   slide = false;
   amp = 0.3f;
+  
+  junoPhaseA = 0.0f; // initialize Juno phases and slow modulation phase
+  junoPhaseB = 0.5f; // offset for stereo-like feel
+  junoModPhase = 0.0f;
   filter.reset();
 }
 
@@ -153,6 +157,34 @@ float TB303Voice::oscSuperSaw() {
   return sum * kGain;
 }
 
+// juno-style saw (two detuned saws with subtle low-rate modulation)
+float TB303Voice::oscJunoSaw() {
+  float lfoHz = 0.6f;
+  junoModPhase += lfoHz * invSampleRate;
+  if (junoModPhase >= 1.0f) junoModPhase -= 1.0f;
+  float lfo = sinf(2.0f * 3.14159265f * junoModPhase);
+
+  float baseInc = freq * invSampleRate;
+  phase += baseInc;
+  if (phase >= 1.0f) phase -= 1.0f;
+  float baseSaw = 2.0f * phase - 1.0f;
+
+  // Subtle chorus-like detune around +/- ~0.4% with a tiny LFO sway
+  float detA = 0.004f + 0.003f * lfo;     // +0.4% +/- 0.3%
+  float detB = -0.004f + 0.003f * (-lfo); // -0.4% -/+ 0.3%
+  float incA = freq * (1.0f + detA) * invSampleRate;
+  float incB = freq * (1.0f + detB) * invSampleRate;
+  junoPhaseA += incA;
+  junoPhaseB += incB;
+  if (junoPhaseA >= 1.0f) junoPhaseA -= floorf(junoPhaseA);
+  if (junoPhaseB >= 1.0f) junoPhaseB -= floorf(junoPhaseB);
+  float sawA = 2.0f * junoPhaseA - 1.0f;
+  float sawB = 2.0f * junoPhaseB - 1.0f;
+
+  float sum = baseSaw + sawA + sawB;
+  return sum * (1.0f / 3.0f);
+}
+
 float TB303Voice::oscillatorSample() {
   int oscIdx = oscillatorIndex();
   if (oscIdx == 1) {
@@ -161,6 +193,9 @@ float TB303Voice::oscillatorSample() {
   }
   if (oscIdx == 2) {
     return oscSuperSaw();
+  }
+  if (oscIdx == 3) {
+  	return oscJunoSaw();
   }
   return oscSaw();
 }
@@ -235,6 +270,6 @@ void TB303Voice::initParameters() {
   params[static_cast<int>(TB303ParamId::Resonance)] = Parameter("res", "", 0.0f, 0.95f, 0.25f, (0.95f - 0.0f) / 128);
   params[static_cast<int>(TB303ParamId::EnvAmount)] = Parameter("env", "Hz", 0.0f, 1800.0f, 250.0f, (1800.0f - 0.0f) / 128);
   params[static_cast<int>(TB303ParamId::EnvDecay)] = Parameter("dec", "ms", 20.0f, 2200.0f, 420.0f, (2200.0f - 20.0f) / 128);
-  params[static_cast<int>(TB303ParamId::Oscillator)] = Parameter("osc", "", kOscillatorOptions, 3, 0);
+  params[static_cast<int>(TB303ParamId::Oscillator)] = Parameter("osc", "", kOscillatorOptions, 4, 0);
   params[static_cast<int>(TB303ParamId::MainVolume)] = Parameter("vol", "", 0.0f, 1.0f, 0.8f, 1.0f / 128);
 }

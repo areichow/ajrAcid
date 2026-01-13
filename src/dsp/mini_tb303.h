@@ -45,6 +45,7 @@ private:
   float oscSaw();
   float oscSquare(float saw);
   float oscSuperSaw();
+  float oscJunoSaw();
   float oscillatorSample();
   float svfProcess(float input);
   void initParameters();
@@ -53,6 +54,9 @@ private:
 
   float phase;
   float superPhases[kSuperSawOscCount];
+  float junoPhaseA;
+  float junoPhaseB;
+  float junoModPhase;
   float freq;       // current frequency (Hz)
   float targetFreq; // slide target
   float slideSpeed; // how fast we slide toward target
