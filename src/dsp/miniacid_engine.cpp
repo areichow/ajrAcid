@@ -181,7 +181,10 @@ MiniAcid::MiniAcid(float sampleRate, SceneStorage* sceneStorage)
     delay303(sampleRate),
     delay3032(sampleRate),
     distortion303(),
-    distortion3032() {
+    distortion3032(),
+    currentStepDurationSamples(0),
+    swingAmount_(DEFAULT_SWING_AMOUNT)
+{
   if (sampleRateValue <= 0.0f) sampleRateValue = 44100.0f;
   reset();
 }
@@ -225,6 +228,7 @@ void MiniAcid::reset() {
   currentStepIndex = -1;
   samplesIntoStep = 0;
   updateSamplesPerStep();
+  currentStepDurationSamples = (unsigned long)samplesPerStep; //swing
   delay303.reset();
   delay303.setBeats(0.5f); // eighth note
   delay303.setMix(0.25f);
@@ -287,8 +291,15 @@ void MiniAcid::setBpm(float bpm) {
 float MiniAcid::bpm() const { return bpmValue; }
 float MiniAcid::sampleRate() const { return sampleRateValue; }
 
-bool MiniAcid::isPlaying() const { return playing; }
+float MiniAcid::swingAmount() const { return swingAmount_; } // swing
+void MiniAcid::setSwingAmount(float amount) {
+  if (amount < 0.0f) amount = 0.0f;
+  if (amount > 1.0f) amount = 1.0f;
+  swingAmount_ = amount;
+}
 
+
+bool MiniAcid::isPlaying() const { return playing; }
 int MiniAcid::currentStep() const { return currentStepIndex; }
 
 int MiniAcid::currentDrumPatternIndex() const {
@@ -867,6 +878,17 @@ void MiniAcid::updateSamplesPerStep() {
   samplesPerStep = sampleRateValue * 60.0f / (bpmValue * 4.0f);
 }
 
+unsigned long MiniAcid::computeStepDurationSamples(int stepIndex) const {
+  float base = samplesPerStep;
+  const float offset = swingAmount_ / 3.0f; // 0..1 -> 0..1/3
+  const bool isFirstOfPair = (stepIndex % 2) == 0;
+  float dur = isFirstOfPair ? base * (1.0f + offset)
+                            : base * (1.0f - offset);
+  unsigned long samples = (unsigned long)(dur + 0.5f);
+  if (samples < 1UL) samples = 1UL;
+  return samples;
+}
+
 float MiniAcid::noteToFreq(int note) {
   return 440.0f * powf(2.0f, (note - 69) / 12.0f);
 }
@@ -966,6 +988,7 @@ void MiniAcid::advanceStep() {
   if (clap.steps[currentStepIndex].hit && !muteClap && drumsActive)
     //drums->triggerCymbal(stepAccent);
     drums->triggerClap(stepAccent);
+  currentStepDurationSamples = computeStepDurationSamples(currentStepIndex);   // set the swing-adjusted duration for this new step
 }
 
 void MiniAcid::generateAudioBuffer(int16_t *buffer, size_t numSamples) {

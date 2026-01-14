@@ -19,6 +19,7 @@ static const int AUDIO_BUFFER_SAMPLES = 256; // per buffer, mono
 static const int SEQ_STEPS = 16;             // 16-step sequencer
 static const int NUM_303_VOICES = 2;
 static const int NUM_DRUM_VOICES = DrumPatternSet::kVoices;
+static constexpr float DEFAULT_SWING_AMOUNT = 0.6f; // swing - 0.0 = straight (50/50), 1.0 ≈ triplet feel (~66/33).
 
 // ===================== Parameters =====================
 
@@ -70,6 +71,10 @@ public:
   void setBpm(float bpm);
   float bpm() const;
   float sampleRate() const;
+
+  void setSwingAmount(float amount); // swing api - 0.0-1.0; 0=50/50; 1=66/33
+  float swingAmount() const;
+
   bool isPlaying() const;
   int currentStep() const;
   int currentDrumPatternIndex() const;
@@ -171,6 +176,7 @@ public:
 private:
   void updateSamplesPerStep();
   void advanceStep();
+  unsigned long computeStepDurationSamples(int stepIndex) const; // swing-adjusted duration
   float noteToFreq(int note);
   int clamp303Voice(int voiceIndex) const;
   int clamp303Step(int stepIndex) const;
@@ -223,6 +229,8 @@ private:
   volatile int currentStepIndex;
   unsigned long samplesIntoStep;
   float samplesPerStep;
+  unsigned long currentStepDurationSamples; // swing-adjusted duration of current step
+  float swingAmount_;
   bool songMode_;
   int drumCycleIndex_;
   int songPlayheadPosition_;
