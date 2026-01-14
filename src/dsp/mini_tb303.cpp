@@ -200,7 +200,7 @@ float TB303Voice::oscJunoSaw() {
   sawB -= poly_blep(junoPhaseB, dtB);
 
   float sum = baseSaw + sawA + sawB;
-  return sum * (1.0f / 3.0f);
+  return sum * (1.0f / 3.0f) * 1.15f; // ~ +1.2 dB gain
 }
 
 float TB303Voice::oscillatorSample() {
