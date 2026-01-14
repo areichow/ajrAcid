@@ -133,13 +133,13 @@ void loop() {
       if (g_miniDisplay) g_miniDisplay->nextPage();
       drawUI();
     } else if (c == 'i' || c == 'I') {
-      g_miniAcid.setSwingAmount(g_miniAcid.swingAmount() - 0.05f); // dec swing amount
+      g_miniAcid.setSwingAmount(g_miniAcid.swingAmount() - 2.0f); // dec swing (percent scale 20..80)
       drawUI();
     } else if (c == 'o' || c == 'O') {
-      g_miniAcid.setSwingAmount(g_miniAcid.swingAmount() + 0.05f); // inc swing amount
+      g_miniAcid.setSwingAmount(g_miniAcid.swingAmount() + 2.0f); // inc swing (percent scale 20..80)
       drawUI();
     } else if (c == '\t') {
-      g_miniAcid.setSwingAmount(0.0f);
+      g_miniAcid.setSwingAmount(50.0f); // reset swing to straight
       drawUI();
     } else if (c == 'p' || c == 'P') {
       g_miniAcid.randomizeDrumPattern();

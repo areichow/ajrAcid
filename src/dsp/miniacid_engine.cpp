@@ -293,8 +293,8 @@ float MiniAcid::sampleRate() const { return sampleRateValue; }
 
 float MiniAcid::swingAmount() const { return swingAmount_; } // swing
 void MiniAcid::setSwingAmount(float amount) {
-  if (amount < 0.0f) amount = 0.0f;
-  if (amount > 1.0f) amount = 1.0f;
+  if (amount < 20.0f) amount = 20.0f;
+  if (amount > 80.0f) amount = 80.0f;
   swingAmount_ = amount;
 }
 
@@ -879,11 +879,22 @@ void MiniAcid::updateSamplesPerStep() {
 }
 
 unsigned long MiniAcid::computeStepDurationSamples(int stepIndex) const {
+  // straight 50/50 16th duration as baseline
   float base = samplesPerStep;
-  const float offset = swingAmount_ / 3.0f; // 0..1 -> 0..1/3
-  const bool isFirstOfPair = (stepIndex % 2) == 0;
-  float dur = isFirstOfPair ? base * (1.0f + offset)
-                            : base * (1.0f - offset);
+
+  // swingAmount_ is a percent in [20..80]. convert to alpha in [-0.6..+0.6],
+  // where alpha = 0 -> 50/50, alpha = +0.2 -> 60/40, alpha = +0.333 -> 66.7/33.3, etc.
+  // originally I use alpha, adapted to the 20-80 scale like the novation circuit and mpc
+  float p = swingAmount_;
+  if (p < 20.0f) p = 20.0f;
+  if (p > 80.0f) p = 80.0f;
+  float alpha = (p - 50.0f) / 50.0f;
+
+  // alternate between long/short on every pair of 16ths globally
+  // (0 long, 1 short), (2 long, 3 short), ...
+  bool firstOfPair = ((stepIndex % 2) == 0);
+  float dur = firstOfPair ? base * (1.0f + alpha)
+                          : base * (1.0f - alpha);
   unsigned long samples = (unsigned long)(dur + 0.5f);
   if (samples < 1UL) samples = 1UL;
   return samples;
@@ -1002,7 +1013,7 @@ void MiniAcid::generateAudioBuffer(int16_t *buffer, size_t numSamples) {
 
   for (size_t i = 0; i < numSamples; ++i) {
     if (playing) {
-      if (samplesIntoStep >= (unsigned long)samplesPerStep) {
+      if (samplesIntoStep >= currentStepDurationSamples) {
         samplesIntoStep = 0;
         advanceStep();
       }

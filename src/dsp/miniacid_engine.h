@@ -19,7 +19,7 @@ static const int AUDIO_BUFFER_SAMPLES = 256; // per buffer, mono
 static const int SEQ_STEPS = 16;             // 16-step sequencer
 static const int NUM_303_VOICES = 2;
 static const int NUM_DRUM_VOICES = DrumPatternSet::kVoices;
-static constexpr float DEFAULT_SWING_AMOUNT = 0.6f; // swing - 0.0 = straight (50/50), 1.0 ≈ triplet feel (~66/33).
+static constexpr float DEFAULT_SWING_AMOUNT = 60.0f; // swing percent 20..80; 50=50/50; 80=80/20; 20=20/80
 
 // ===================== Parameters =====================
 
@@ -72,7 +72,7 @@ public:
   float bpm() const;
   float sampleRate() const;
 
-  void setSwingAmount(float amount); // swing api - 0.0-1.0; 0=50/50; 1=66/33
+  void setSwingAmount(float amount); // 20..80 percent
   float swingAmount() const;
 
   bool isPlaying() const;
