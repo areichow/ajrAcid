@@ -4,8 +4,8 @@
 #include <stdlib.h>
 
 namespace {
-const char* const kOscillatorOptions[] = {"saw", "sqr", "super", "juno"};
-} // namespace
+const char* const kOscillatorOptions[] = {"saw", "sqr", "super", "juno", "analog", "pwm"};
+}
 
 ChamberlinFilter::ChamberlinFilter(float sampleRate) : _lp(0.0f), _bp(0.0f), _sampleRate(sampleRate) {
   if (_sampleRate <= 0.0f) _sampleRate = 44100.0f;
@@ -200,7 +200,59 @@ float TB303Voice::oscJunoSaw() {
   sawB -= poly_blep(junoPhaseB, dtB);
 
   float sum = baseSaw + sawA + sawB;
-  return sum * (1.0f / 3.0f) * 1.15f; // ~ +1.2 dB gain
+  return sum * (1.0f / 3.0f) * 1.3f;
+}
+
+
+float TB303Voice::oscAnalogSaw() {
+    // very light drift & tilt for "analog" character (mono-friendly)
+    // reuse junoModPhase as slow LFO; keep the engine diff minimal
+    float lfoHz = 0.45f;
+    junoModPhase += lfoHz * invSampleRate; if (junoModPhase >= 1.0f) junoModPhase -= 1.0f;
+    float lfo = sinf(2.0f * 3.14159265f * junoModPhase);
+
+    // small per-sample frequency flutter (subtle)
+    float flutter = 1.0f + 0.00025f * lfo;
+    float inc = freq * invSampleRate * flutter;
+    phase += inc; if (phase >= 1.0f) phase -= 1.0f;
+
+    // naive saw
+    float x = 2.0f * phase - 1.0f;
+    // gentle "tilt" for analog core curvature
+    x += 0.10f * x * x;
+
+    // polyblep to band-limit the edge at phase wrap
+    float dt = inc; if (dt > 1.0f) dt = 1.0f;
+    x -= poly_blep(phase, dt);
+
+    // tiny extra warmth; keep conservative
+    return x * 1.05f;
+}
+
+float TB303Voice::oscPWM() {
+    // juno-like PWM: slow LFO modulates duty; band-limit both edges
+    float lfoHz = 0.6f;
+    junoModPhase += lfoHz * invSampleRate; if (junoModPhase >= 1.0f) junoModPhase -= 1.0f;
+    float lfo = sinf(2.0f * 3.14159265f * junoModPhase);
+
+    // 40–60% duty, softly animated
+    float pwm = 0.5f + 0.10f * lfo;
+
+    // advance base phase
+    float inc = freq * invSampleRate;
+    phase += inc; if (phase >= 1.0f) phase -= 1.0f;
+    float dt = inc; if (dt > 1.0f) dt = 1.0f;
+
+    // naive square: -1 .. +1
+    float y = (phase < pwm ? 1.0f : -1.0f);
+
+    // polyBLEP corrections: one at 0 (rising), one at pwm (falling)
+    y += poly_blep(phase, dt);
+    float t2 = phase - pwm; if (t2 < 0.0f) t2 += 1.0f;
+    y -= poly_blep(t2, dt);
+
+    // slightly fuller level to feel "Juno square"-ish; keep headroom
+    return y * 0.95f;
 }
 
 float TB303Voice::oscillatorSample() {
@@ -214,6 +266,12 @@ float TB303Voice::oscillatorSample() {
   }
   if (oscIdx == 3) {
   	return oscJunoSaw();
+  }
+  if (oscIdx == 4) {
+      return oscAnalogSaw();
+  }
+  if (oscIdx == 5) {
+      return oscPWM();
   }
   return oscSaw();
 }
@@ -288,6 +346,6 @@ void TB303Voice::initParameters() {
   params[static_cast<int>(TB303ParamId::Resonance)] = Parameter("res", "", 0.0f, 0.95f, 0.25f, (0.95f - 0.0f) / 128);
   params[static_cast<int>(TB303ParamId::EnvAmount)] = Parameter("env", "Hz", 0.0f, 1800.0f, 250.0f, (1800.0f - 0.0f) / 128);
   params[static_cast<int>(TB303ParamId::EnvDecay)] = Parameter("dec", "ms", 20.0f, 2200.0f, 420.0f, (2200.0f - 20.0f) / 128);
-  params[static_cast<int>(TB303ParamId::Oscillator)] = Parameter("osc", "", kOscillatorOptions, 4, 0);
+  params[static_cast<int>(TB303ParamId::Oscillator)] = Parameter("osc", "", kOscillatorOptions, 6, 0);
   params[static_cast<int>(TB303ParamId::MainVolume)] = Parameter("vol", "", 0.0f, 1.0f, 0.8f, 1.0f / 128);
 }

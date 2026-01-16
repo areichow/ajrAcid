@@ -45,7 +45,9 @@ private:
   float oscSaw();
   float oscSquare(float saw);
   float oscSuperSaw();
-  float oscJunoSaw();
+  float oscJunoSaw();  
+  float oscAnalogSaw();
+  float oscPWM();
   float oscillatorSample();
   float svfProcess(float input);
   void initParameters();
