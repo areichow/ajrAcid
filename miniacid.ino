@@ -138,10 +138,8 @@ void loop() {
     } else if (c == 'o' || c == 'O') {
       g_miniAcid.setSwingAmount(g_miniAcid.swingAmount() + 2.0f); // inc swing (percent scale 20..80)
       drawUI();
-    } else if (c == '\t') {
-      g_miniAcid.setSwingAmount(50.0f); // reset swing to straight
-      drawUI();
     } else if (c == 'p' || c == 'P') {
+      g_miniAcid.setSwingAmount(50.0f); // reset swing to straight
       g_miniAcid.randomizeDrumPattern();
       drawUI();
     } else if (c == '1') {
