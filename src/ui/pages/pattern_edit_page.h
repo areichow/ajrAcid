@@ -3,6 +3,9 @@
 #include "../pages/help_dialog.h"
 #include "../ui_colors.h"
 #include "../ui_utils.h"
+#include <array>
+#include <vector>
+
 class BankSelectionBarComponent;
 class PatternSelectionBarComponent;
 
@@ -29,6 +32,31 @@ class PatternEditPage : public IPage, public IMultiHelpFramesProvider {
  private:
   enum class Focus { Steps = 0, PatternRow, BankRow };
 
+	// undo/redo state
+  struct PatternState {
+    int8_t notes[SEQ_STEPS];
+    bool accent[SEQ_STEPS];
+    bool slide[SEQ_STEPS];
+  };
+
+	// undo/redo - capturing snapshots
+  void captureCurrentState(PatternState& out) const;
+  void applyStateNoTrack(const PatternState& st); // apply without affecting undo/redo
+  int activeBankIndex() const;    // current bank from engine
+  int activePatternIndex() const; // current pattern from engine
+
+ 	// edit scoping
+  void beginEdit();
+  void endEdit();
+  void markChanged();
+
+	// write operations
+  void adjustStepNote(int step, int delta);
+  void adjustStepOctave(int step, int delta);
+  void clearStepNote(int step);
+  void toggleAccentStep(int step);
+  void toggleSlideStep(int step);
+
   int clampCursor(int cursorIndex) const;
   int activeBankCursor() const;
   int patternIndexFromKey(char key) const;
@@ -41,6 +69,12 @@ class PatternEditPage : public IPage, public IMultiHelpFramesProvider {
   void transposePattern(int semitoneDelta);
   void rotatePattern(int delta); // +1 = forward/right, -1 = backward/left
   void copyFirstHalfToSecondHalf();
+
+  // undo/redo commands
+  bool canUndo() const;
+  bool canRedo() const;
+  void undo();
+  void redo();
 
   IGfx& gfx_;
   MiniAcid& mini_acid_;
@@ -56,4 +90,14 @@ class PatternEditPage : public IPage, public IMultiHelpFramesProvider {
   std::shared_ptr<BankSelectionBarComponent> bank_bar_;
 
   int last_note_entered_; // remembers last explicit note value placed/edited
+
+  // undo/redo containers: per-bank, per-pattern for this voice
+  using PatternStack = std::vector<PatternState>;
+  std::array<std::array<PatternStack, Bank<SynthPattern>::kPatterns>, kBankCount> undo_;
+  std::array<std::array<PatternStack, Bank<SynthPattern>::kPatterns>, kBankCount> redo_;
+
+	// edit scope bookkeeping
+  int edit_depth_ = 0;
+  bool edit_changed_ = false;
+  PatternState pre_edit_state_;
 };
